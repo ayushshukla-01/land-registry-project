@@ -1,0 +1,113 @@
+Smart Contract Code (Solidity):
+
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract LandRegistry {
+    struct Land {
+        uint id;
+        address owner;
+        string location;
+        uint price;
+        bool isForSale;
+    }
+
+    mapping(uint => Land) public lands;
+    mapping(address => uint[]) public ownerLands;
+    uint public landCount = 0;
+
+    event LandRegistered(uint id, address owner, string location, uint price);
+    event OwnershipTransferred(uint id, address previousOwner, address newOwner);
+    event LandListedForSale(uint id, uint price);
+    event LandSaleCanceled(uint id);
+
+    modifier onlyOwner(uint _id) {
+        require(lands[_id].owner == msg.sender, "Not the owner");
+        _;
+    }
+
+    function registerLand(string memory _location, uint _price) public {
+        landCount++;
+        lands[landCount] = Land(landCount, msg.sender, _location, _price, false);
+        ownerLands[msg.sender].push(landCount);
+        emit LandRegistered(landCount, msg.sender, _location, _price);
+    }
+
+    function listLandForSale(uint _id, uint _price) public onlyOwner(_id) {
+        lands[_id].isForSale = true;
+        lands[_id].price = _price;
+        emit LandListedForSale(_id, _price);
+    }
+
+    function cancelLandSale(uint _id) public onlyOwner(_id) {
+        lands[_id].isForSale = false;
+        emit LandSaleCanceled(_id);
+    }
+
+    function transferOwnership(uint _id, address _newOwner) public payable {
+        require(lands[_id].isForSale, "Land not for sale");
+        require(msg.value >= lands[_id].price, "Insufficient payment");
+
+        address previousOwner = lands[_id].owner;
+        lands[_id].owner = _newOwner;
+        lands[_id].isForSale = false;
+
+        payable(previousOwner).transfer(msg.value);
+        emit OwnershipTransferred(_id, previousOwner, _newOwner);
+    }
+
+    function getLandsByOwner(address _owner) public view returns (uint[] memory) {
+        return ownerLands[_owner];
+    }
+}
+
+
+Frontend (React.js) - Web3 Integration:
+
+npm install ethers web3
+
+Connect to MetaMask:
+
+import { ethers } from "ethers";
+
+async function connectWallet() {
+    if (window.ethereum) {
+        const provider = new ethers.providers.Web3Provider(window.ethereum);
+        await window.ethereum.request({ method: "eth_requestAccounts" });
+        const signer = provider.getSigner();
+        console.log("Connected Wallet:", await signer.getAddress());
+    } else {
+        alert("MetaMask not detected!");
+    }
+}
+
+Interact with Smart Contract:
+
+const contractAddress = "YOUR_SMART_CONTRACT_ADDRESS";
+const abi = [ /* Paste ABI here from compiled Solidity contract */ ];
+
+async function registerLand(location, price) {
+    const provider = new ethers.providers.Web3Provider(window.ethereum);
+    const signer = provider.getSigner();
+    const contract = new ethers.Contract(contractAddress, abi, signer);
+
+    const tx = await contract.registerLand(location, ethers.utils.parseEther(price.toString()));
+    await tx.wait();
+    console.log("Land Registered Successfully");
+}
+
+
+Expected Results:
+Smart Contract Execution:
+
+The smart contract manages the registration of land, allowing users to list it for sale and transfer ownership.
+Actions like land registration, sale listing, and ownership transfers will trigger events that you can monitor in the blockchain.
+React Frontend:
+
+MetaMask Connection: When a user connects their MetaMask wallet, the app will show the wallet address.
+Land Registration Form: Users can enter land location and price, which will be registered in the smart contract once they click the "Register Land" button.
+Confirmation Messages: After a successful transaction, confirmation messages will be shown (e.g., "Land Registered Successfully").
+Visuals Expected:
+MetaMask Wallet Connection Prompt: A prompt where users will allow the app to connect to their MetaMask wallet.
+Input Forms: Fields where users can enter land details (e.g., location and price).
+Transaction Status: Visual feedback, such as loading indicators, success/failure notifications for smart contract interactions.
